@@ -1,6 +1,8 @@
 SYSTEM     = x86-64_sles10_4.1
 LIBFORMAT  = static_pic
 DEPS = CG.h gnrl.h lap.h Param.h system.h
+CPLEXVERSION=125
+
 #------------------------------------------------------------
 #
 # When you adapt this makefile to compile your CPLEX programs
@@ -9,8 +11,8 @@ DEPS = CG.h gnrl.h lap.h Param.h system.h
 #
 #------------------------------------------------------------
 
-CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio125/cplex
-CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio125/concert
+CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio$(CPLEXVERSION)/cplex
+CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio${CPLEXVERSION)/concert
 # ---------------------------------------------------------------------
 # Compiler selection 
 # ---------------------------------------------------------------------
