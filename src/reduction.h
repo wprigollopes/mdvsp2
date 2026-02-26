@@ -10,7 +10,7 @@ void reduction1(IloArray<IloNumArray> costMatrix, int depots, int nodes,
                 int matrixSize, std::vector<std::vector<bool>> &assignMatrix);
 
 #if HAS_JV
-#include <JV/lap.h>
+#include "JV/lap.h"
 // R2: Jonker-Volgenant LAP-based reduction (per depot)
 void reduction2(IloArray<IloNumArray> costMatrix, int depots, int nodes,
                 int matrixSize, std::vector<std::vector<bool>> &assignMatrix,
