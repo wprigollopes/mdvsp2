@@ -32,6 +32,7 @@ private:
     IloEnv env_;
     IloArray<IloNumArray> &costMatrix_;
     int depots_, nodes_, matrixSize_;
+    unsigned int capacity_; // sized from instance: nodes * depots * 4
     IloNumArray &maxVehiclesPerDepot_;
     bool useInitialSolution_;
 
