@@ -15,7 +15,6 @@ void reduction1(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, std::vector<char> &assignMatrix);
 
 #if HAS_JV
-#include "JV/lap.h"
 // R2: Jonker-Volgenant LAP-based reduction (per depot, parallelized with OpenMP)
 void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, std::vector<char> &assignMatrix,

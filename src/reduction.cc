@@ -47,52 +47,45 @@ void reduction1(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
 }
 
 #if HAS_JV
+#include "JV/lap.h"
 
-// R2: LAP-based reduction per depot using Jonker-Volgenant.
+// R2: LAP-based reduction per depot using AVX2-optimized Jonker-Volgenant.
 // Parallelized with OpenMP — each depot is independent.
-// Each thread allocates its own LAP work arrays to avoid contention.
+// Uses float for AVX2 SIMD (8 values/cycle vs 1 in scalar double).
 void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, vector<char> &assignMatrix,
                 vector<vector<char>> &assignSImatrix)
 {
     int enddim = nodes + nodes;
+    static const float INF_COST = static_cast<float>(INFEASIBLE_VALUE);
 
     #pragma omp parallel for schedule(dynamic)
     for (int depot = 0; depot < depots; depot++) {
-        // Per-thread LAP work arrays
-        vector<vector<cost>> origAssignCost(enddim, vector<cost>(enddim));
-        vector<col> rowsol(enddim);
-        vector<row> colsol(enddim);
-        vector<cost> u(enddim);
-        vector<cost> v(enddim);
+        // Per-thread LAP work arrays — flat cost matrix for AVX2 JV
+        vector<float> lapCost(enddim * enddim, 0.0f);
+        vector<int> rowsol(enddim);
+        vector<int> colsol(enddim);
+        vector<float> u(enddim);
+        vector<float> v(enddim);
 
-        // Zero the bottom-right quadrant (same for all depots)
-        for (int i = 0; i < nodes; i++)
-            for (int j = 0; j < nodes; j++)
-                origAssignCost[i + nodes][j + nodes] = 0;
-
-        // Build pointer array for lap() which expects cost**
-        vector<cost *> costPtrs(enddim);
-        for (int i = 0; i < enddim; i++)
-            costPtrs[i] = origAssignCost[i].data();
-
-        // Fill cost matrix for this depot
+        // Fill cost matrix for this depot (flat row-major: [i * enddim + j])
+        // Bottom-right quadrant already zero from initialization
         for (int i = 0; i < nodes; i++) {
             for (int j = 0; j < nodes; j++) {
-                origAssignCost[i][j] = (costMatrix[i + depots][j + depots] == -1)
-                    ? INFEASIBLE_VALUE : (cost)costMatrix[i + depots][j + depots];
-                origAssignCost[i + nodes][j] = (costMatrix[depot][j + depots] == -1)
-                    ? INFEASIBLE_VALUE : (cost)costMatrix[depot][j + depots];
-                origAssignCost[j][i + nodes] = (costMatrix[j + depots][depot] == -1)
-                    ? INFEASIBLE_VALUE : (cost)costMatrix[j + depots][depot];
+                lapCost[i * enddim + j] = (costMatrix[i + depots][j + depots] == -1)
+                    ? INF_COST : static_cast<float>(costMatrix[i + depots][j + depots]);
+                lapCost[(i + nodes) * enddim + j] = (costMatrix[depot][j + depots] == -1)
+                    ? INF_COST : static_cast<float>(costMatrix[depot][j + depots]);
+                lapCost[j * enddim + (i + nodes)] = (costMatrix[j + depots][depot] == -1)
+                    ? INF_COST : static_cast<float>(costMatrix[j + depots][depot]);
             }
         }
 
-        lap(enddim, costPtrs.data(), rowsol.data(), colsol.data(),
-            u.data(), v.data());
+        lap<true, false>(enddim, lapCost.data(), rowsol.data(), colsol.data(),
+                         u.data(), v.data());
 
         // Write results — assignMatrix uses char so distinct indices are safe,
-        // but assignSImatrix[depot] is depot-exclusive so no contention.
+        // assignSImatrix[depot] is depot-exclusive so no contention.
         for (int dim = 0; dim < enddim; dim++) {
             int from = dim >= nodes ? depot : dim + depots;
             int to = rowsol[dim] >= nodes ? depot : rowsol[dim] + depots;

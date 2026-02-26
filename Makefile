@@ -24,9 +24,9 @@ CCC = g++
 # ---------------------------------------------------------------------
 
 CXXFLAGS = -std=c++17 -O2 -Wall -m64 -fPIC -fstrict-aliasing \
-           -fexceptions -fopenmp -DIL_STD -pthread
+           -fexceptions -fopenmp -mavx2 -DIL_STD -pthread
 
-# JV (Jonker-Volgenant) LAP solver for reduction2 and initial solution
+# JV (Jonker-Volgenant) LAP solver for reduction2 and initial solution (header-only, AVX2)
 CXXFLAGS += -DHAS_JV=1
 
 # ---------------------------------------------------------------------
@@ -58,9 +58,6 @@ SRCS = $(SRCDIR)/main.cc \
 
 OBJS = $(patsubst $(SRCDIR)/%.cc,$(OBJDIR)/%.o,$(SRCS))
 
-# JV LAP solver objects
-JV_OBJS = $(OBJDIR)/lap.o
-
 TARGET = mdvsp
 
 # ---------------------------------------------------------------------
@@ -69,14 +66,11 @@ TARGET = mdvsp
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS) $(JV_OBJS)
-	$(CCC) $(CXXFLAGS) $(OBJS) $(JV_OBJS) -o $@ $(CCLNFLAGS)
+$(TARGET): $(OBJS)
+	$(CCC) $(CXXFLAGS) $(OBJS) -o $@ $(CCLNFLAGS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cc | $(OBJDIR)
 	$(CCC) -c $(CXXFLAGS) $(INCLUDES) $< -o $@
-
-$(OBJDIR)/lap.o: JV/lap.cpp | $(OBJDIR)
-	$(CCC) -c $(CXXFLAGS) -IJV $< -o $@
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
