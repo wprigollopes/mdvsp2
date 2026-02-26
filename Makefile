@@ -26,9 +26,6 @@ CCC = g++
 CXXFLAGS = -std=c++17 -O2 -Wall -m64 -fPIC -fstrict-aliasing \
            -fexceptions -fopenmp -mavx2 -DIL_STD -pthread
 
-# JV (Jonker-Volgenant) LAP solver for reduction2 and initial solution (header-only, AVX2)
-CXXFLAGS += -DHAS_JV=1
-
 # ---------------------------------------------------------------------
 # Link options and libraries
 # ---------------------------------------------------------------------

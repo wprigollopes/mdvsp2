@@ -3,11 +3,6 @@
 
 #include <vector>
 
-// Set to 1 when JV (Jonker-Volgenant) LAP solver files are available
-#ifndef HAS_JV
-#define HAS_JV 0
-#endif
-
 constexpr unsigned int ZMIN = 0;
 constexpr unsigned int ITER_MIN = 30;
 constexpr float OMEGA_MIN = 0.9f;

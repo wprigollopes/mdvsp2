@@ -64,13 +64,8 @@ int main(int argc, char **argv)
         for (int k = 0; k < depots; k++)
             predSI[k].assign(matrixSize, 0);
 
-#if HAS_JV
         bool useInitialSolution = true;
         cout << "With Initial Solution: Yes" << endl;
-#else
-        bool useInitialSolution = false;
-        cout << "With Initial Solution: No (JV not available)" << endl;
-#endif
         cout << "==============================================" << endl;
 
         // Run reductions and optionally compute initial solution
@@ -83,10 +78,8 @@ int main(int argc, char **argv)
         cg.initialize();
         cg.buildSubproblemGraphs();
 
-#if HAS_JV
         if (useInitialSolution)
             cg.addInitialColumns(predSI, assignSImatrix);
-#endif
 
         int result = cg.solve();
         env.end();
