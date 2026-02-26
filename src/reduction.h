@@ -19,7 +19,7 @@ void reduction1(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
 // R2: Jonker-Volgenant LAP-based reduction (per depot, parallelized with OpenMP)
 void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, std::vector<char> &assignMatrix,
-                std::vector<std::vector<std::vector<bool>>> &assignSImatrix);
+                std::vector<std::vector<char>> &assignSImatrix);
 #endif
 
 // R3: LP relaxation-based reduction (skips infeasible arcs from LP model)
@@ -31,7 +31,7 @@ void reduction3(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
 bool applyReductions(IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                      int matrixSize, IloNumArray maxVehiclesPerDepot,
                      std::vector<std::vector<int>> &predSI,
-                     std::vector<std::vector<std::vector<bool>>> &assignSImatrix,
+                     std::vector<std::vector<char>> &assignSImatrix,
                      bool doR1 = true, bool doR2 = true, bool doR3 = true,
                      bool doSI = true);
 

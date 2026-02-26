@@ -2,6 +2,7 @@
 #include "reduction.h"
 #include "column_gen.h"
 #include <ilcplex/ilocplex.h>
+#include <cstdlib>
 #include <string>
 #include <iostream>
 
@@ -16,14 +17,14 @@ static void readdata(const char *filename,
                      IloNumArray &maxVehiclesPerDepot)
 {
     ifstream in(filename);
-    if (in) {
-        in >> depots;
-        in >> nodes;
-        in >> maxVehiclesPerDepot;
-        in >> costMatrix;
-    } else {
+    if (!in) {
         cerr << "File not found: " << filename << endl;
+        exit(1);
     }
+    in >> depots;
+    in >> nodes;
+    in >> maxVehiclesPerDepot;
+    in >> costMatrix;
 }
 
 int main(int argc, char **argv)
@@ -56,10 +57,8 @@ int main(int argc, char **argv)
              << endl;
 
         // Reduction data structures
-        vector<vector<vector<bool>>> assignSImatrix(depots);
-        for (int k = 0; k < depots; k++) {
-            assignSImatrix[k].assign(matrixSize, vector<bool>(matrixSize, false));
-        }
+        vector<vector<char>> assignSImatrix(depots,
+            vector<char>(matrixSize * matrixSize, 0));
 
         vector<vector<int>> predSI(depots);
         for (int k = 0; k < depots; k++)
@@ -77,7 +76,7 @@ int main(int argc, char **argv)
         // Run reductions and optionally compute initial solution
         applyReductions(costMatrix, depots, nodes, matrixSize,
                         maxVehiclesPerDepot, predSI, assignSImatrix,
-                        false, false, false, useInitialSolution);
+                        true, true, true, useInitialSolution);
 
         // Set up and run column generation
         ColumnGenerator cg(env, costMatrix, depots, nodes, maxVehiclesPerDepot);

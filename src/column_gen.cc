@@ -13,8 +13,7 @@ ColumnGenerator::ColumnGenerator(IloEnv env, IloArray<IloNumArray> &costMatrix,
       omega_(env, ITERLIM), omegasSelected_(ITERLIM, false),
       masterValues_(ITERLIM, 0), iterations_(1), stabilized_(0),
       lastRoundingIter_(0), lbSet_(CG_TYPE != 1), piDuals_(env),
-      sigmaDuals_(env), masterData_(env), graphs_(depots),
-      pred_(matrixSize)
+      sigmaDuals_(env), masterData_(env), graphs_(depots)
 {
 }
 
@@ -40,21 +39,35 @@ void ColumnGenerator::initialize()
 
 void ColumnGenerator::buildSubproblemGraphs()
 {
+    // Build shared trip-to-trip arcs once
+    tripArcs_.build(costMatrix_, depots_);
+
+    // Build per-depot source/sink arcs, referencing shared trip arcs
     for (int k = 0; k < depots_; k++)
-        graphs_[k].build(costMatrix_, depots_, k);
+        graphs_[k].build(costMatrix_, depots_, k, tripArcs_);
+
+    // Pre-allocate shortest path workspace (reused across all calls)
+    int N = tripArcs_.num_trips;
+    pred_.resize(N + 2);
+    dist_.resize(N + 2);
 }
 
 #if HAS_JV
 void ColumnGenerator::addInitialColumns(
     const vector<vector<int>> &predSI,
-    const vector<vector<vector<bool>>> &assignSImatrix)
+    const vector<vector<char>> &assignSImatrix)
 {
     useInitialSolution_ = true;
 
     for (int k = 0; k < depots_; k++) {
         for (int i = 0; i < matrixSize_; i++) {
-            if (!assignSImatrix[k][i][k])
+            if (!assignSImatrix[k][i * matrixSize_ + k])
                 continue;
+
+            if (p_ >= ITERLIM) {
+                cerr << "Warning: column limit reached (" << ITERLIM << ")" << endl;
+                return;
+            }
 
             a_[p_] = IloNumArray(env_, nodes_);
             int pathCost = 0;
@@ -101,6 +114,11 @@ void ColumnGenerator::addInitialColumns(
 
 void ColumnGenerator::addColumn(const vector<int> &pred, int depot)
 {
+    if (p_ >= ITERLIM) {
+        cerr << "Warning: column limit reached (" << ITERLIM << ")" << endl;
+        return;
+    }
+
     int N = nodes_;
     a_[p_] = IloNumArray(env_, N);
     c_[p_] = 0;
@@ -227,7 +245,7 @@ int ColumnGenerator::solve()
 
                 for (int k = 0; k < depots_; k++) {
                     long long spDist = dag_shortest_path(
-                        graphs_[k], pred_, piDuals_, sigmaDuals_, k);
+                        graphs_[k], pred_, dist_, piDuals_, sigmaDuals_, k);
 
                     if (spDist < 0) {
                         addColumn(pred_, k);

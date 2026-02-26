@@ -16,7 +16,7 @@ public:
 
 #if HAS_JV
     void addInitialColumns(const std::vector<std::vector<int>> &predSI,
-                           const std::vector<std::vector<std::vector<bool>>> &assignSImatrix);
+                           const std::vector<std::vector<char>> &assignSImatrix);
 #endif
 
     // Returns 0=success, 1=infeasible, 2=iteration limit
@@ -64,9 +64,11 @@ private:
     IloNumArray sigmaDuals_;
     IloNumArray masterData_;
 
-    // Subproblem graphs (one per depot)
+    // Subproblem graphs (shared trip arcs + per-depot graphs)
+    TripArcs tripArcs_;
     std::vector<SubproblemGraph> graphs_;
     std::vector<int> pred_;
+    std::vector<long long> dist_;
 };
 
 #endif

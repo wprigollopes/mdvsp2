@@ -53,7 +53,7 @@ void reduction1(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
 // Each thread allocates its own LAP work arrays to avoid contention.
 void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, vector<char> &assignMatrix,
-                vector<vector<vector<bool>>> &assignSImatrix)
+                vector<vector<char>> &assignSImatrix)
 {
     int enddim = nodes + nodes;
 
@@ -96,10 +96,10 @@ void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
         for (int dim = 0; dim < enddim; dim++) {
             int from = dim >= nodes ? depot : dim + depots;
             int to = rowsol[dim] >= nodes ? depot : rowsol[dim] + depots;
-            assignSImatrix[depot][from][to] = true;
+            assignSImatrix[depot][from * matrixSize + to] = 1;
             assignMatrix[from * matrixSize + to] = 1;
         }
-        assignSImatrix[depot][depot][depot] = false;
+        assignSImatrix[depot][depot * matrixSize + depot] = 0;
         assignMatrix[depot * matrixSize + depot] = 0;
     }
 }
@@ -184,7 +184,7 @@ void reduction3(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
 bool applyReductions(IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                      int matrixSize, IloNumArray maxVehiclesPerDepot,
                      vector<vector<int>> &predSI,
-                     vector<vector<vector<bool>>> &assignSImatrix,
+                     vector<vector<char>> &assignSImatrix,
                      bool doR1, bool doR2, bool doR3, bool doSI)
 {
     if (!doR1 && !doR2 && !doR3 && !doSI)
@@ -199,7 +199,7 @@ bool applyReductions(IloArray<IloNumArray> &costMatrix, int depots, int nodes,
         for (int k = 0; k < depots; k++)
             for (int j = 0; j < matrixSize; j++)
                 for (int i = 0; i < matrixSize; i++)
-                    if (assignSImatrix[k][j][i])
+                    if (assignSImatrix[k][j * matrixSize + i])
                         predSI[k][i] = j;
     }
 #endif
