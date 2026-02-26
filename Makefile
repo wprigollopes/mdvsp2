@@ -26,8 +26,8 @@ CCC = g++
 CXXFLAGS = -std=c++17 -O2 -Wall -m64 -fPIC -fstrict-aliasing \
            -fexceptions -DIL_STD -pthread
 
-# Uncomment and set to 1 if JV (Jonker-Volgenant) files are available in JV/
-# CXXFLAGS += -DHAS_JV=1
+# JV (Jonker-Volgenant) LAP solver for reduction2 and initial solution
+CXXFLAGS += -DHAS_JV=1
 
 # ---------------------------------------------------------------------
 # Link options and libraries
@@ -42,7 +42,7 @@ CCLNFLAGS = -L$(CPLEXLIBDIR) -lilocplex -lcplex \
 CONCERTINCDIR = $(CONCERTDIR)/include
 CPLEXINCDIR   = $(CPLEXDIR)/include
 
-INCLUDES = -I$(CPLEXINCDIR) -I$(CONCERTINCDIR) -Isrc
+INCLUDES = -I$(CPLEXINCDIR) -I$(CONCERTINCDIR) -Isrc -I.
 
 # ---------------------------------------------------------------------
 # Source files and objects
@@ -58,6 +58,9 @@ SRCS = $(SRCDIR)/main.cc \
 
 OBJS = $(patsubst $(SRCDIR)/%.cc,$(OBJDIR)/%.o,$(SRCS))
 
+# JV LAP solver objects
+JV_OBJS = $(OBJDIR)/lap.o
+
 TARGET = mdvsp
 
 # ---------------------------------------------------------------------
@@ -66,11 +69,14 @@ TARGET = mdvsp
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CCC) $(CXXFLAGS) $(OBJS) -o $@ $(CCLNFLAGS)
+$(TARGET): $(OBJS) $(JV_OBJS)
+	$(CCC) $(CXXFLAGS) $(OBJS) $(JV_OBJS) -o $@ $(CCLNFLAGS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cc | $(OBJDIR)
 	$(CCC) -c $(CXXFLAGS) $(INCLUDES) $< -o $@
+
+$(OBJDIR)/lap.o: JV/lap.cpp | $(OBJDIR)
+	$(CCC) -c $(CXXFLAGS) -IJV $< -o $@
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
