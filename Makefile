@@ -24,7 +24,7 @@ CCC = g++
 # ---------------------------------------------------------------------
 
 CXXFLAGS = -std=c++17 -O2 -Wall -m64 -fPIC -fstrict-aliasing \
-           -fexceptions -DIL_STD -pthread
+           -fexceptions -fopenmp -DIL_STD -pthread
 
 # JV (Jonker-Volgenant) LAP solver for reduction2 and initial solution
 CXXFLAGS += -DHAS_JV=1
@@ -37,7 +37,7 @@ CPLEXLIBDIR   = $(CPLEXDIR)/lib/$(SYSTEM)/$(LIBFORMAT)
 CONCERTLIBDIR = $(CONCERTDIR)/lib/$(SYSTEM)/$(LIBFORMAT)
 
 CCLNFLAGS = -L$(CPLEXLIBDIR) -lilocplex -lcplex \
-            -L$(CONCERTLIBDIR) -lconcert -lm -pthread
+            -L$(CONCERTLIBDIR) -lconcert -lm -fopenmp -pthread
 
 CONCERTINCDIR = $(CONCERTDIR)/include
 CPLEXINCDIR   = $(CPLEXDIR)/include
