@@ -8,7 +8,7 @@
 #define NUMTRIPS 1500
 #define NUMDEPOTS 8
 #define NUM_STABILIZED 1e6
-#define bigM 1e6
+// bigM macro removed — use BIGM const instead
 #define INFEASIBLEVALUE 1e8
 using namespace std;
 
@@ -168,11 +168,6 @@ void reducao2Denis(IloArray<IloNumArray> costMatrix, int depots, int nodes, int 
     origAssignCost = new cost *[enddim];
 
     for (unsigned int i = 0; i < enddim; i++)
-    {
-        origAssignCost[i] = new cost[enddim];
-    }
-
-    for (int i = 0; i < enddim; i++)
     {
         origAssignCost[i] = new cost[enddim];
     }
@@ -405,7 +400,7 @@ bool find(deque<int> &List, int k)
 int SLF(vector<int> &pred, IloArray<IloNumArray> &costMatrix, long int nodes, short int depots, unsigned short int depot, IloNumArray &pi, IloNumArray &sigma)
 {
 
-    long int distances[nodes + 2];
+    vector<long long> distances(nodes + 2);
     distances[nodes] = 0;
     pred[nodes] = -1;
     distances[nodes + 1] = INFEASIBLEVALUE;
@@ -537,7 +532,7 @@ int main(int argc, char **argv)
         unsigned short int depots;             // Número de garagens
         unsigned int nodes;                    // Número de nodos
         IloNumArray maxVehiclesPerDepot(env);  // Matriz com o Número máximo de carros por garagem
-        int masterValues[ITERLIM];             // Controle de valores mestre
+        vector<int> masterValues(ITERLIM);      // Controle de valores mestre
         IloArray<IloNumArray> costMatrix(env); // Matriz de custos entre garagens e os pontos "i" e "j"
 
         if (argc > 1)
@@ -551,7 +546,7 @@ int main(int argc, char **argv)
             cout << "instancias/pepin/m4n500s0.inp" << endl;
         }
 
-        unsigned short int matrixSize = depots + nodes; // Tamanho da matriz
+        unsigned int matrixSize = depots + nodes; // Tamanho da matriz
 
         cout << endl
              << endl
@@ -564,10 +559,10 @@ int main(int argc, char **argv)
              << "Z min: " << ZMIN << endl
              << "Forma de geração: " << ((CGTYPE == 1) ? "Com relaxamento" : "Sem relaxamento") << endl;
 
-        unsigned short int p = 0;                   // Contador "p" -> Caminhos
-        unsigned short int p_ = 0;                  // Contador "p_" -> Controle extra dos caminhos
-        unsigned int p__ = 0;                       //
-        unsigned short int pAnt = 0;                // Contador "pAnt" -> Controle dos caminhos adicionados ao problema
+        unsigned int p = 0;                          // Contador "p" -> Caminhos
+        unsigned int p_ = 0;                         // Contador "p_" -> Controle extra dos caminhos
+        unsigned int p__ = 0;                        //
+        unsigned int pAnt = 0;                       // Contador "pAnt" -> Controle dos caminhos adicionados ao problema
         bool solution = false;                      // Variavel de controle para teste se houve ou nao solucao
         vector<bool> checkp(nodes);                 // Variavel que "marca" os caminhos utilizados no RMP
         unsigned int pos = 0;                       // Posicao para processamento do predecessor para a[j][p]
@@ -576,7 +571,7 @@ int main(int argc, char **argv)
         bool testFeasibility6 = false;              // Booleana de testes do STEP 6
         bool checkOmega = false;                    // Verificacao se o Omega foi ou nao alterado
         float lastOmega = 0;                        // Ultimo valor de omega entre os maiores
-        unsigned short int omegasSelected[ITERLIM]; // Omegas selecionados
+        vector<bool> omegasSelected(ITERLIM, false); // Omegas selecionados
         IloIntArray omega(env, ITERLIM);            // Valores de omega com depot
         bool continueGc = true;                     // Booleana de controle para geracao de colunas
         unsigned int iteracoes = 1;                 // Numero de iteracoes
@@ -598,7 +593,7 @@ int main(int argc, char **argv)
         IloNumVarArray deltasigma(env, depots, 0, IloInfinity, ILOFLOAT);
         for (int j = 0; j < nodes; j++)
         {
-            deltapi[j] = IloNumVar(pathsSelect(bigM) + pi[j](1));
+            deltapi[j] = IloNumVar(pathsSelect(BIGM) + pi[j](1));
         }
 
         for (int k = 0; k < depots; k++)
@@ -613,7 +608,7 @@ int main(int argc, char **argv)
         p = 0;
 
         int stabilized = 0;
-        masterValues[0] = NUMTRIPS * bigM;
+        masterValues[0] = NUMTRIPS * BIGM;
 
         vector<vector<vector<bool>>> assignSImatrix(depots);
 
