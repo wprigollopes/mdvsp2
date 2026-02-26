@@ -14,10 +14,8 @@ public:
     void initialize();
     void buildSubproblemGraphs();
 
-#if HAS_JV
     void addInitialColumns(const std::vector<std::vector<int>> &predSI,
                            const std::vector<std::vector<char>> &assignSImatrix);
-#endif
 
     // Returns 0=success, 1=infeasible, 2=iteration limit
     int solve();

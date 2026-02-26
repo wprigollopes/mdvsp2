@@ -46,7 +46,6 @@ void reduction1(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
     }
 }
 
-#if HAS_JV
 #include "JV/lap.h"
 
 // R2: LAP-based reduction per depot using AVX2-optimized Jonker-Volgenant.
@@ -96,8 +95,6 @@ void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
         assignMatrix[depot * matrixSize + depot] = 0;
     }
 }
-
-#endif // HAS_JV
 
 // R3: LP relaxation-based reduction.
 // Only creates variables for feasible arcs (costMatrix != -1), skipping
@@ -185,7 +182,6 @@ bool applyReductions(IloArray<IloNumArray> &costMatrix, int depots, int nodes,
 
     vector<char> assignMatrix(matrixSize * matrixSize, 0);
 
-#if HAS_JV
     // Initial solution uses the LAP-based reduction2
     if (doSI) {
         reduction2(costMatrix, depots, nodes, matrixSize, assignMatrix, assignSImatrix);
@@ -195,16 +191,13 @@ bool applyReductions(IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                     if (assignSImatrix[k][j * matrixSize + i])
                         predSI[k][i] = j;
     }
-#endif
 
     // Reductions are cumulative: each adds arcs to assignMatrix
     if (doR1)
         reduction1(costMatrix, depots, nodes, matrixSize, assignMatrix);
 
-#if HAS_JV
     if (doR2 && !doSI)
         reduction2(costMatrix, depots, nodes, matrixSize, assignMatrix, assignSImatrix);
-#endif
 
     if (doR3)
         reduction3(costMatrix, depots, nodes, matrixSize, assignMatrix, maxVehiclesPerDepot);

@@ -55,7 +55,6 @@ void ColumnGenerator::buildSubproblemGraphs()
     dist_.resize(N + 2);
 }
 
-#if HAS_JV
 void ColumnGenerator::addInitialColumns(
     const vector<vector<int>> &predSI,
     const vector<vector<char>> &assignSImatrix)
@@ -113,7 +112,6 @@ void ColumnGenerator::addInitialColumns(
         }
     }
 }
-#endif
 
 void ColumnGenerator::addColumn(const vector<int> &pred, int depot)
 {
