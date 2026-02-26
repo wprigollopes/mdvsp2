@@ -1,112 +1,93 @@
 #include "reduction.h"
+#include <algorithm>
 #include <cmath>
+#include <utility>
 
 using namespace std;
 
-void reduction1(IloArray<IloNumArray> costMatrix, int depots, int nodes,
+// R1: Keep sqrt(N) cheapest arcs per row and per column.
+// Rewritten with nth_element: O(N^2) instead of original O(N^2 * sqrt(N)).
+// Writes directly to assignMatrix (no intermediate reduceItems matrix).
+void reduction1(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, vector<vector<bool>> &assignMatrix)
 {
-    unsigned int i, j, x;
-    vector<vector<int>> reduceItems(matrixSize, vector<int>(matrixSize, 0));
-    unsigned int reduction = ceil(sqrt((float)nodes));
-    vector<unsigned int> reduceRow(reduction);
-    vector<unsigned int> reduceCol(reduction);
-    vector<int> indexRow(reduction);
-    vector<int> indexCol(reduction);
-    int posChangeRow, posChangeCol;
+    unsigned int keep = ceil(sqrt((float)nodes));
+    vector<pair<double, int>> costs;
+    costs.reserve(nodes);
 
-    for (i = depots; i < (unsigned int)matrixSize; i++) {
-        for (x = 0; x < reduction; x++) {
-            reduceRow[x] = 1e6;
-            reduceCol[x] = 1e6;
-            indexRow[x] = -1;
-            indexCol[x] = -1;
-            posChangeRow = -1;
-            posChangeCol = -1;
-        }
-        for (j = depots; j < (unsigned int)matrixSize; j++) {
-            posChangeRow = -1;
-            posChangeCol = -1;
+    // Row reduction: for each row, keep the cheapest sqrt(N) arcs
+    for (int i = depots; i < matrixSize; i++) {
+        costs.clear();
+        for (int j = depots; j < matrixSize; j++)
+            if (costMatrix[i][j] != -1)
+                costs.push_back({costMatrix[i][j], j});
 
-            // Row reduction: keep cheapest arcs by row
-            if (costMatrix[i][j] != -1) {
-                for (x = 0; x < reduction; x++) {
-                    if (costMatrix[i][j] <= reduceRow[x]) {
-                        posChangeRow = x;
-                        break;
-                    }
-                }
-                if (posChangeRow != -1) {
-                    for (x = reduction - 1; x > (unsigned int)posChangeRow; x--) {
-                        reduceRow[x] = reduceRow[x - 1];
-                        indexRow[x] = indexRow[x - 1];
-                    }
-                    reduceRow[posChangeRow] = costMatrix[i][j];
-                    indexRow[posChangeRow] = j;
-                }
-            }
+        unsigned int n = min((unsigned int)costs.size(), keep);
+        if (n < costs.size())
+            nth_element(costs.begin(), costs.begin() + n, costs.end());
 
-            // Column reduction: keep cheapest arcs by column
-            if (costMatrix[j][i] != -1) {
-                for (x = 0; x < reduction; x++) {
-                    if (costMatrix[j][i] <= reduceCol[x]) {
-                        posChangeCol = x;
-                        break;
-                    }
-                }
-                if (posChangeCol != -1) {
-                    for (x = reduction - 1; x > (unsigned int)posChangeCol; x--) {
-                        reduceCol[x] = reduceCol[x - 1];
-                        indexCol[x] = indexCol[x - 1];
-                    }
-                    reduceCol[posChangeCol] = costMatrix[j][i];
-                    indexCol[posChangeCol] = i;
-                }
-            }
-        }
-        for (x = 0; x < reduction; x++) {
-            if (indexRow[x] != -1)
-                reduceItems[i][indexRow[x]] = 1;
-            if (indexCol[x] != -1)
-                reduceItems[indexCol[x]][i] = 1;
-        }
+        for (unsigned int x = 0; x < n; x++)
+            assignMatrix[i][costs[x].second] = true;
     }
-    for (i = depots; i < (unsigned int)matrixSize; i++)
-        for (j = depots; j < (unsigned int)matrixSize; j++)
-            if (reduceItems[i][j] == 1)
-                assignMatrix[i][j] = true;
+
+    // Column reduction: for each column, keep the cheapest sqrt(N) arcs
+    for (int j = depots; j < matrixSize; j++) {
+        costs.clear();
+        for (int i = depots; i < matrixSize; i++)
+            if (costMatrix[i][j] != -1)
+                costs.push_back({costMatrix[i][j], i});
+
+        unsigned int n = min((unsigned int)costs.size(), keep);
+        if (n < costs.size())
+            nth_element(costs.begin(), costs.begin() + n, costs.end());
+
+        for (unsigned int x = 0; x < n; x++)
+            assignMatrix[costs[x].second][j] = true;
+    }
 }
 
 #if HAS_JV
 
-void reduction2(IloArray<IloNumArray> costMatrix, int depots, int nodes,
+// R2: LAP-based reduction per depot using Jonker-Volgenant.
+// Allocates once, fills per-depot. Uses vectors instead of raw new/delete.
+void reduction2(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, vector<vector<bool>> &assignMatrix,
                 vector<vector<vector<bool>>> &assignSImatrix)
 {
     int enddim = nodes + nodes;
-    cost **origAssignCost = new cost *[enddim];
-    for (int i = 0; i < enddim; i++)
-        origAssignCost[i] = new cost[enddim];
 
-    col *rowsol = new col[enddim];
-    row *colsol = new row[enddim];
-    cost *u = new cost[enddim];
-    cost *v = new cost[enddim];
+    // Allocate once, reuse across depots
+    vector<vector<cost>> origAssignCost(enddim, vector<cost>(enddim));
+    vector<col> rowsol(enddim);
+    vector<row> colsol(enddim);
+    vector<cost> u(enddim);
+    vector<cost> v(enddim);
+
+    // Zero the bottom-right quadrant once (same for all depots)
+    for (int i = 0; i < nodes; i++)
+        for (int j = 0; j < nodes; j++)
+            origAssignCost[i + nodes][j + nodes] = 0;
+
+    // Build pointer array for lap() which expects cost**
+    vector<cost *> costPtrs(enddim);
+    for (int i = 0; i < enddim; i++)
+        costPtrs[i] = origAssignCost[i].data();
 
     for (int depot = 0; depot < depots; depot++) {
+        // Fill cost matrix for this depot
         for (int i = 0; i < nodes; i++) {
             for (int j = 0; j < nodes; j++) {
-                origAssignCost[i][j] = (cost)(costMatrix[i + depots][j + depots] == -1
-                    ? INFEASIBLE_VALUE : costMatrix[i + depots][j + depots]);
-                origAssignCost[i + nodes][j] = (cost)(costMatrix[depot][j + depots] == -1
-                    ? INFEASIBLE_VALUE : costMatrix[depot][j + depots]);
-                origAssignCost[j][i + nodes] = (cost)(costMatrix[j + depots][depot] == -1
-                    ? INFEASIBLE_VALUE : costMatrix[j + depots][depot]);
-                origAssignCost[i + nodes][j + nodes] = 0;
+                origAssignCost[i][j] = (costMatrix[i + depots][j + depots] == -1)
+                    ? INFEASIBLE_VALUE : (cost)costMatrix[i + depots][j + depots];
+                origAssignCost[i + nodes][j] = (costMatrix[depot][j + depots] == -1)
+                    ? INFEASIBLE_VALUE : (cost)costMatrix[depot][j + depots];
+                origAssignCost[j][i + nodes] = (costMatrix[j + depots][depot] == -1)
+                    ? INFEASIBLE_VALUE : (cost)costMatrix[j + depots][depot];
             }
         }
 
-        lap(enddim, origAssignCost, rowsol, colsol, u, v);
+        lap(enddim, costPtrs.data(), rowsol.data(), colsol.data(),
+            u.data(), v.data());
 
         for (int dim = 0; dim < enddim; dim++) {
             int from = dim >= nodes ? depot : dim + depots;
@@ -117,72 +98,77 @@ void reduction2(IloArray<IloNumArray> costMatrix, int depots, int nodes,
         assignSImatrix[depot][depot][depot] = false;
         assignMatrix[depot][depot] = false;
     }
-
-    for (int i = 0; i < enddim; i++)
-        delete[] origAssignCost[i];
-    delete[] origAssignCost;
-    delete[] rowsol;
-    delete[] colsol;
-    delete[] u;
-    delete[] v;
 }
 
 #endif // HAS_JV
 
-void reduction3(IloArray<IloNumArray> costMatrix, int depots, int nodes,
+// R3: LP relaxation-based reduction.
+// Only creates variables for feasible arcs (costMatrix != -1), skipping
+// depot-to-depot arcs. This shrinks the LP and removes big-M numerics.
+void reduction3(const IloArray<IloNumArray> &costMatrix, int depots, int nodes,
                 int matrixSize, vector<vector<bool>> &assignMatrix,
                 IloNumArray maxVehiclesPerDepot)
 {
     IloEnv env;
     IloModel relaxMDVSP(env);
     IloCplex solver(relaxMDVSP);
+    solver.setOut(env.getNullStream());
+
     IloRangeArray pi = IloAdd(relaxMDVSP, IloRangeArray(env, nodes, 1, 1));
     IloRangeArray sigma1 = IloAdd(relaxMDVSP, IloRangeArray(env, 0, maxVehiclesPerDepot));
     IloRangeArray sigma2 = IloAdd(relaxMDVSP, IloRangeArray(env, 0, maxVehiclesPerDepot));
 
+    // Track which (i,j) have variables so we can skip them in constraints
+    vector<vector<bool>> hasVar(matrixSize, vector<bool>(matrixSize, false));
     IloArray<IloNumVarArray> x(env, matrixSize);
-    for (unsigned int k = 0; k < (unsigned int)matrixSize; k++)
+    for (int k = 0; k < matrixSize; k++)
         x[k] = IloNumVarArray(env, matrixSize);
 
-    for (unsigned int i = 0; i < (unsigned int)matrixSize; i++) {
-        for (unsigned int j = 0; j < (unsigned int)matrixSize; j++) {
-            if ((int)i < depots && (int)j >= depots)
+    // Create variables only for feasible arcs
+    for (int i = 0; i < matrixSize; i++) {
+        for (int j = 0; j < matrixSize; j++) {
+            // Skip infeasible arcs and depot-to-depot arcs
+            if (costMatrix[i][j] == -1 || (i < depots && j < depots)) {
+                x[i][j] = IloNumVar(env, 0, 0);
+                continue;
+            }
+
+            hasVar[i][j] = true;
+            if (i < depots && j >= depots)
                 x[i][j] = IloNumVar(pi[j - depots](1) + sigma1[i](1));
-            else if ((int)i >= depots && (int)j < depots)
+            else if (i >= depots && j < depots)
                 x[i][j] = IloNumVar(sigma2[j](1));
-            else if ((int)i >= depots && (int)j >= depots)
+            else // i >= depots && j >= depots
                 x[i][j] = IloNumVar(pi[j - depots](1));
-            else
-                x[i][j] = IloNumVar(env);
         }
     }
 
+    // Flow conservation — only feasible arcs
     for (int i = depots; i < matrixSize; i++) {
         IloExpr flowIn(env);
         IloExpr flowOut(env);
         for (int j = 0; j < matrixSize; j++) {
-            flowIn += x[j][i];
-            flowOut += x[i][j];
+            if (hasVar[j][i]) flowIn += x[j][i];
+            if (hasVar[i][j]) flowOut += x[i][j];
         }
         relaxMDVSP.add(flowIn - flowOut == 0);
         flowIn.end();
         flowOut.end();
     }
 
+    // Objective — only feasible arcs, no big-M costs
     IloExpr objective(env);
-    for (unsigned int i = 0; i < (unsigned int)matrixSize; i++)
-        for (unsigned int j = 0; j < (unsigned int)matrixSize; j++)
-            if (costMatrix[i][j] == -1)
-                objective += INFEASIBLE_VALUE * x[i][j];
-            else
+    for (int i = 0; i < matrixSize; i++)
+        for (int j = 0; j < matrixSize; j++)
+            if (hasVar[i][j])
                 objective += costMatrix[i][j] * x[i][j];
 
     relaxMDVSP.add(IloMinimize(env, objective));
 
     if (solver.solve()) {
-        for (unsigned int i = 0; i < (unsigned int)matrixSize; i++)
-            for (unsigned int j = 0; j < (unsigned int)matrixSize; j++)
-                if (solver.getValue(x[i][j]) > 0)
+        for (int i = 0; i < matrixSize; i++)
+            for (int j = 0; j < matrixSize; j++)
+                if (hasVar[i][j] && solver.getValue(x[i][j]) > 0)
                     assignMatrix[i][j] = true;
     }
 
