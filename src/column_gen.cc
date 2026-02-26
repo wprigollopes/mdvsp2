@@ -1,4 +1,5 @@
 #include "column_gen.h"
+#include <algorithm>
 #include <iostream>
 
 using namespace std;
@@ -7,11 +8,13 @@ ColumnGenerator::ColumnGenerator(IloEnv env, IloArray<IloNumArray> &costMatrix,
                                  int depots, int nodes,
                                  IloNumArray &maxVehiclesPerDepot)
     : env_(env), costMatrix_(costMatrix), depots_(depots), nodes_(nodes),
-      matrixSize_(depots + nodes), maxVehiclesPerDepot_(maxVehiclesPerDepot),
+      matrixSize_(depots + nodes),
+      capacity_(std::max(nodes * depots * 4, 1000)),
+      maxVehiclesPerDepot_(maxVehiclesPerDepot),
       useInitialSolution_(false), masterModel_(env), master_(masterModel_),
-      p_(0), c_(env, ITERLIM), y_(env, ITERLIM), a_(env, ITERLIM),
-      omega_(env, ITERLIM), omegasSelected_(ITERLIM, false),
-      masterValues_(ITERLIM, 0), iterations_(1), stabilized_(0),
+      p_(0), c_(env, capacity_), y_(env, capacity_), a_(env, capacity_),
+      omega_(env, capacity_), omegasSelected_(capacity_, false),
+      masterValues_(capacity_, 0), iterations_(1), stabilized_(0),
       lastRoundingIter_(0), lbSet_(CG_TYPE != 1), piDuals_(env),
       sigmaDuals_(env), masterData_(env), graphs_(depots)
 {
@@ -64,8 +67,8 @@ void ColumnGenerator::addInitialColumns(
             if (!assignSImatrix[k][i * matrixSize_ + k])
                 continue;
 
-            if (p_ >= ITERLIM) {
-                cerr << "Warning: column limit reached (" << ITERLIM << ")" << endl;
+            if (p_ >= capacity_) {
+                cerr << "Warning: column limit reached (" << capacity_ << ")" << endl;
                 return;
             }
 
@@ -114,8 +117,8 @@ void ColumnGenerator::addInitialColumns(
 
 void ColumnGenerator::addColumn(const vector<int> &pred, int depot)
 {
-    if (p_ >= ITERLIM) {
-        cerr << "Warning: column limit reached (" << ITERLIM << ")" << endl;
+    if (p_ >= capacity_) {
+        cerr << "Warning: column limit reached (" << capacity_ << ")" << endl;
         return;
     }
 
@@ -297,7 +300,7 @@ int ColumnGenerator::solve()
         continueCG = true;
     }
 
-    if (p_ >= ITERLIM) {
+    if (p_ >= capacity_) {
         cout << "Iteration limit exceeded, result: "
              << masterValues_[iterations_ - 1] << endl;
     }
