@@ -1,7 +1,6 @@
-SYSTEM     = x86-64_sles10_4.1
+SYSTEM     ?= x86-64_sles10_4.1
 LIBFORMAT  = static_pic
-DEPS = CG.h gnrl.h lap.h Param.h system.h
-CPLEXVERSION=125
+CPLEXVERSION ?= 2211
 
 #------------------------------------------------------------
 #
@@ -12,70 +11,69 @@ CPLEXVERSION=125
 #------------------------------------------------------------
 
 CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio$(CPLEXVERSION)/cplex
-CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio${CPLEXVERSION)/concert
-# ---------------------------------------------------------------------
-# Compiler selection 
-# ---------------------------------------------------------------------
-
-CCC = g++ -Ofast 
+CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio$(CPLEXVERSION)/concert
 
 # ---------------------------------------------------------------------
-# Compiler options 
+# Compiler selection
 # ---------------------------------------------------------------------
 
-CCOPT = -m64 -O -fPIC -fstrict-aliasing -fexceptions -DIL_STD -pthread
+CCC = g++
+
+# ---------------------------------------------------------------------
+# Compiler options
+# ---------------------------------------------------------------------
+
+CXXFLAGS = -std=c++17 -O2 -Wall -m64 -fPIC -fstrict-aliasing \
+           -fexceptions -fopenmp -mavx2 -DIL_STD -pthread
 
 # ---------------------------------------------------------------------
 # Link options and libraries
 # ---------------------------------------------------------------------
 
-CPLEXBINDIR   = $(CPLEXDIR)/bin/$(BINDIST)
 CPLEXLIBDIR   = $(CPLEXDIR)/lib/$(SYSTEM)/$(LIBFORMAT)
 CONCERTLIBDIR = $(CONCERTDIR)/lib/$(SYSTEM)/$(LIBFORMAT)
-LOCALDIR = .
 
-CCLNFLAGS = -L$(CPLEXLIBDIR) -lilocplex -lcplex -L$(CONCERTLIBDIR) -lconcert -lm -pthread
-
-
-all:
-	make all_cpp
+CCLNFLAGS = -L$(CPLEXLIBDIR) -lilocplex -lcplex \
+            -L$(CONCERTLIBDIR) -lconcert -lm -fopenmp -pthread
 
 CONCERTINCDIR = $(CONCERTDIR)/include
 CPLEXINCDIR   = $(CPLEXDIR)/include
 
-CCFLAGS = $(CCOPT) -I$(CPLEXINCDIR) -I$(CONCERTINCDIR) -I${LOCALDIR} 
+INCLUDES = -I$(CPLEXINCDIR) -I$(CONCERTINCDIR) -Isrc -I.
 
+# ---------------------------------------------------------------------
+# Source files and objects
+# ---------------------------------------------------------------------
 
-CPP_EX = main
+SRCDIR = src
+OBJDIR = obj
 
-all_cpp: $(CPP_EX)
+SRCS = $(SRCDIR)/main.cc \
+       $(SRCDIR)/shortest_path.cc \
+       $(SRCDIR)/reduction.cc \
+       $(SRCDIR)/column_gen.cc
 
-# ------------------------------------------------------------
+OBJS = $(patsubst $(SRCDIR)/%.cc,$(OBJDIR)/%.o,$(SRCS))
 
-clean :
-	/bin/rm -rf $(CPP_EX)
-	/bin/rm -rf *.mps *.ord *.sos *.lp *.sav *.net *.msg *.log *.clp *.o
+TARGET = mdvsp
 
-# ------------------------------------------------------------
-#
-# The examples
-#
-main: main.o JV/lap.o
-	$(CCC) $(CCFLAGS) main.o -o main $(CCLNFLAGS)
+# ---------------------------------------------------------------------
+# Rules
+# ---------------------------------------------------------------------
 
+all: $(TARGET)
 
-main.o: main.cc
-	$(CCC) -c $(CCFLAGS) main.cc -o main.o
+$(TARGET): $(OBJS)
+	$(CCC) $(CXXFLAGS) $(OBJS) -o $@ $(CCLNFLAGS)
 
+$(OBJDIR)/%.o: $(SRCDIR)/%.cc | $(OBJDIR)
+	$(CCC) -c $(CXXFLAGS) $(INCLUDES) $< -o $@
 
-JV/lap.o: JV/lap.cpp JV/system.o 
-	$(CCC) -c $(CCFLAGS) JV/lap.cpp -o JV/lap.o
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
 
+clean:
+	rm -rf $(TARGET) $(OBJDIR)
+	rm -f *.mps *.ord *.sos *.lp *.sav *.net *.msg *.log *.clp
 
-JV/system.o: JV/system.cpp
-	$(CCC) -c $(CCFLAGS) JV/system.cpp -o JV/system.o
-
-
-# Local Variables:
-# mode: makefile
-# End:
+.PHONY: all clean
